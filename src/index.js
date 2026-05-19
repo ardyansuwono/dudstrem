@@ -1,13 +1,13 @@
 import { bot } from "./bot.js";
 import { cobalt } from "./cobalt.js";
+import { createServer } from "node:http";
 
 const PORT = parseInt(process.env.PORT ?? "3000");
-const WEBHOOK_URL = process.env.WEBHOOK_URL; // e.g. https://your-bot.railway.app
+const WEBHOOK_URL = process.env.WEBHOOK_URL;
 
 async function start() {
   console.log("🚀 Starting Cobalt Telegram Bot...");
 
-  // Check cobalt API availability
   const alive = await cobalt.ping();
   if (!alive) {
     console.warn("⚠️  Cobalt API tidak merespons. Pastikan COBALT_API_URL benar.");
@@ -15,7 +15,6 @@ async function start() {
     console.log("✅ Cobalt API terhubung:", process.env.COBALT_API_URL);
   }
 
-  // Set bot commands menu
   await bot.api.setMyCommands([
     { command: "start", description: "Mulai bot" },
     { command: "download", description: "Download dengan pilihan format" },
@@ -24,9 +23,8 @@ async function start() {
   ]);
 
   if (WEBHOOK_URL) {
-    // Webhook mode (recommended for Railway production)
+    // Webhook mode (Railway production)
     const { webhookCallback } = await import("grammy");
-    const { createServer } = await import("node:http");
     const handleUpdate = webhookCallback(bot, "http");
 
     const server = createServer(async (req, res) => {
@@ -48,9 +46,24 @@ async function start() {
     const webhookEndpoint = `${WEBHOOK_URL}/webhook`;
     await bot.api.setWebhook(webhookEndpoint);
     console.log(`✅ Webhook set: ${webhookEndpoint}`);
+
   } else {
-    // Long polling mode (local dev)
-    console.log("📡 Starting in long-polling mode (development)...");
+    // Long polling — HTTP server tetap harus jalan untuk Railway healthcheck
+    const server = createServer((req, res) => {
+      if (req.url === "/health") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ status: "ok", bot: "cobalt-telegram-bot" }));
+      } else {
+        res.writeHead(404);
+        res.end("Not found");
+      }
+    });
+
+    server.listen(PORT, () => {
+      console.log(`🌐 Health server listening on port ${PORT}`);
+    });
+
+    console.log("📡 Starting in long-polling mode...");
     await bot.api.deleteWebhook();
     bot.start();
     console.log("✅ Bot running via long polling.");
