@@ -1,5 +1,5 @@
 import { Bot, InlineKeyboard, InputFile } from "grammy";
-import { limit } from "@grammyjs/ratelimiter";
+import { limit } from "./ratelimit.js";
 import { cobalt } from "./cobalt.js";
 import { detectPlatform, formatFileSize, sleep } from "./utils.js";
 import { sessions } from "./session.js";
